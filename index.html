@@ -202,6 +202,7 @@ tr:hover td{background:var(--primary-lt);}
 .b-approver{background:#F3E5F5;color:#4A148C;}
 .b-finance{background:#FFF3E0;color:#BF360C;}
 .b-confirmed{background:#E8F5E9;color:#1B5E20;}
+.b-returned{background:#CFD8DC;color:#263238;}
 .b-rejected{background:#FFEBEE;color:#B71C1C;}
 .btn-sm{background:none;border:2px solid var(--cream2);color:var(--muted);padding:4px 10px;font-size:10px;font-weight:900;cursor:pointer;font-family:'Inter',sans-serif;margin-right:4px;transition:all .15s;letter-spacing:.04em;text-transform:uppercase;}
 .btn-sm:hover{border-color:var(--primary);color:var(--primary);}
@@ -366,17 +367,9 @@ tr:hover td{background:var(--primary-lt);}
     <div class="login-card">
       <div class="tab-label">Admin Access</div>
       <div class="login-big">後台<span>管理</span>登入</div>
-      <div class="login-sub">請選擇身份並輸入對應密碼</div>
-      <select id="loginRole" style="width:100%">
-        <option value="">請選擇身份 —</option>
-        <option value="supervisor">直屬主管 Direct Supervisor</option>
-        <option value="super">系統管理員 Admin</option>
-      </select>
+      <div class="login-sub">系統管理員登入</div>
       <input id="loginPw" type="password" placeholder="密碼 Password" style="width:100%" onkeydown="if(event.key==='Enter')doLogin()">
       <button class="btn-blue" onclick="doLogin()">登入 LOGIN</button>
-      <div class="login-hint">
-        預設密碼：<code>supervisor</code> / <code>super1234</code>
-      </div>
     </div>
   </div>
 </div>
@@ -414,8 +407,7 @@ tr:hover td{background:var(--primary-lt);}
 
 <script>
 const ROLES={
-  supervisor:{label:'直屬主管',pw:'supervisor'},
-  super:     {label:'系統管理員',pw:'super1234'},
+  super:{label:'系統管理員',pw:'super1234'},
 };
 const EQUIPMENT=[
   {id:1,  cat:'相機',   name:'Sony a7RIII（#1）',      spec:''},
@@ -441,8 +433,8 @@ const EQUIPMENT=[
   {id:21, cat:'器材',   name:'DJI RS4 Mini 穩定器',     spec:'含配件'},
   {id:22, cat:'記憶卡', name:'相機記憶卡（SD）',         spec:'共三張'},
 ];
-const STEP_ORDER=['supervisor','equipment_admin','approver','finance'];
-const STEP_LABELS={supervisor:'直屬主管',equipment_admin:'器材管理員',approver:'核准主管',finance:'財務審核'};
+const STEP_ORDER=['equipment_admin','finance'];
+const STEP_LABELS={equipment_admin:'器材管理員',finance:'財務審核'};
 // ── Google Sheets API 設定 ────────────────────────────
 const API_URL = 'https://script.google.com/macros/s/AKfycbwbnhrc58dk7bH7sAIAbUYFgX_9cW6x_pIFMkWaiEZfLSXS59Q4ViUt0yC-Pm6iQwpx/exec'; // ← 部署後把網址貼在這裡
 
@@ -561,11 +553,9 @@ function queryOrders(){
 }
 function goAdmin(){currentUser?showPage('admin'):showPage('login');}
 function doLogin(){
-  const role=document.getElementById('loginRole').value;
   const pw=document.getElementById('loginPw').value;
-  if(!role)return showToast('請選擇身份',true);
-  if(pw!==ROLES[role].pw)return showToast('密碼錯誤',true);
-  currentUser={role,label:ROLES[role].label};
+  if(pw!==ROLES.super.pw)return showToast('密碼錯誤',true);
+  currentUser={role:'super',label:ROLES.super.label};
   localStorage.setItem('studio_user',JSON.stringify(currentUser));
   document.getElementById('userChip').style.display='flex';
   document.getElementById('chipRole').textContent=currentUser.label;
@@ -639,12 +629,10 @@ function submitForm(){
     purpose:document.getElementById('f-purpose').value,
     items:[...selected].map(id=>EQUIPMENT.find(e=>e.id===id)),
     flow:{
-      supervisor:      {status:'pending', by:'',at:'',note:''},
-      equipment_admin: {status:'waiting', by:'',at:'',note:''},
-      approver:        {status:'waiting', by:'',at:'',note:''},
+      equipment_admin: {status:'pending', by:'',at:'',note:''},
       finance:         {status:'skip',   by:'',at:'',note:''},
     },
-    needFinance:false,currentStep:'supervisor',finalStatus:'pending',
+    needFinance:false,currentStep:'equipment_admin',finalStatus:'pending',
     createdAt:new Date().toISOString(),
   };
   state.orders.unshift(order);save();
@@ -656,7 +644,7 @@ function submitForm(){
 }
 
 // ADMIN
-const ROLE_TABS={super:['orders','eqstatus'],supervisor:['orders']};
+const ROLE_TABS={super:['orders','eqstatus']};
 const TAB_LABELS={orders:'租借申請',eqstatus:'器材狀態'};
 function renderAdmin(){
   if(!currentUser)return;
@@ -701,20 +689,31 @@ function buildOrdersHTML(){
         <td>
           <button class="btn-sm" onclick="viewOrder('${o.id}')">詳情</button>
           ${canAct?`<button class="btn-sm gr" onclick="approveStep('${o.id}')">通過</button><button class="btn-sm rd" onclick="openReject('${o.id}')">拒絕</button>`:''}
-          ${canAct&&role==='equipment_admin'&&!o.needFinance?`<button class="btn-sm pu" onclick="addFinance('${o.id}')">+財務</button>`:''}
           ${canAct&&role==='super'&&!o.needFinance?`<button class="btn-sm pu" onclick="addFinance('${o.id}')">+財務</button>`:''}
           ${role==='super'&&o.needFinance&&o.finalStatus==='pending'?`<button class="btn-sm" onclick="removeFinance('${o.id}')">取消財務</button>`:''}
+          ${o.finalStatus==='confirmed'&&role==='super'?pickupActionsHTML(o):''}
           ${role==='super'?`<button class="btn-sm" onclick="openEditOrder('${o.id}')">編輯</button><button class="btn-sm rd" onclick="deleteOrder('${o.id}')">刪除</button>`:''}
         </td>
       </tr>`;
     }).join('')}</tbody>
   </table></div>`;
 }
+function pickupActionsHTML(o){
+  const p=o.pickup?.status||'awaiting';
+  if(p==='awaiting')return`<button class="btn-sm pu" onclick="markPickup('${o.id}','checked')">標記已清點</button>`;
+  if(p==='checked')return`<button class="btn-sm gr" onclick="markPickup('${o.id}','returned')">標記已歸還</button><button class="btn-sm" onclick="markPickup('${o.id}','awaiting')">還原</button>`;
+  return`<button class="btn-sm" onclick="markPickup('${o.id}','checked')">還原</button>`;
+}
 function getStepBadge(o){
-  if(o.finalStatus==='confirmed')return`<span class="badge b-confirmed">✓ 已通過</span>`;
+  if(o.finalStatus==='confirmed'){
+    const p=o.pickup?.status||'awaiting';
+    const pMap={awaiting:['b-pending','待清點'],checked:['b-finance','已清點・待歸還'],returned:['b-returned','已歸還']};
+    const[pcls,ptxt]=pMap[p];
+    return`<span class="badge b-confirmed">✓ 已通過</span> <span class="badge ${pcls}">${ptxt}</span>`;
+  }
   if(o.finalStatus==='rejected') return`<span class="badge b-rejected">✕ 已拒絕</span>`;
-  const m={supervisor:'b-supervisor',equipment_admin:'b-admin',approver:'b-approver',finance:'b-finance'};
-  const l={supervisor:'待主管審核',equipment_admin:'待管理員確認',approver:'待核准主管',finance:'待財務審核'};
+  const m={equipment_admin:'b-admin',finance:'b-finance'};
+  const l={equipment_admin:'待管理員確認',finance:'待財務審核'};
   return`<span class="badge ${m[o.currentStep]||'b-pending'}">${l[o.currentStep]||o.currentStep}</span>`;
 }
 function buildEqHTML(){
@@ -745,12 +744,20 @@ function buildEqHTML(){
 }
 function setEqStatus(id,status){const eq=state.eqStatus.find(e=>e.id===id);if(eq){eq.status=status;save();if(API_URL)apiPost({action:'saveEq',eqList:state.eqStatus}).catch(()=>{});showToast('器材狀態已更新');}}
 
+function markPickup(id,status){
+  const o=state.orders.find(x=>x.id===id);if(!o)return;
+  o.pickup={status,by:currentUser.label,at:new Date().toISOString()};
+  save();
+  if(API_URL)apiPost({action:'updateOrder',order:o}).catch(()=>{});
+  renderAdmin();
+  showToast(status==='checked'?'已標記為已清點':status==='returned'?'已標記為已歸還':'狀態已還原');
+}
 function removeFinance(id){
   const o=state.orders.find(x=>x.id===id);if(!o)return;
   o.needFinance=false;
   o.flow.finance={status:'skip',by:'',at:'',note:''};
-  // 如果當前步驟就是 finance，退回 approver
-  if(o.currentStep==='finance'){o.currentStep='approver';o.flow.approver.status='pending';}
+  // 如果當前步驟就是 finance，退回器材管理員
+  if(o.currentStep==='finance'){o.currentStep='equipment_admin';o.flow.equipment_admin.status='pending';}
   save();
   if(API_URL)apiPost({action:'updateOrder',order:o}).catch(()=>{});
   renderAdmin();showToast('已取消財務審核關卡');
@@ -925,12 +932,19 @@ function viewOrder(id){
     const by=f.by?`<br><span style="font-size:9px;color:var(--muted)">${f.by}${note}</span>`:'';
     return`${i>0?'<span class="flow-arrow">→</span>':''}<span class="flow-step ${cls}">${icon} ${STEP_LABELS[s]}${by}</span>`;
   }).join('');
-  document.getElementById('mFlow').innerHTML=`<div style="margin-top:10px"><div style="font-size:9px;font-weight:900;color:var(--muted);letter-spacing:.14em;text-transform:uppercase;font-family:Inter,sans-serif;margin-bottom:10px">簽核進度</div><div class="flow-row">${fhtml}</div></div>`;
+  document.getElementById('mFlow').innerHTML=`<div style="margin-top:10px"><div style="font-size:9px;font-weight:900;color:var(--muted);letter-spacing:.14em;text-transform:uppercase;font-family:Inter,sans-serif;margin-bottom:10px">簽核進度</div><div class="flow-row">${fhtml}</div></div>`+
+    (o.finalStatus==='confirmed'?(()=>{
+      const p=o.pickup?.status||'awaiting';
+      const pMap={awaiting:['b-pending','待清點'],checked:['b-finance','已清點・待歸還'],returned:['b-returned','已歸還']};
+      const[pcls,ptxt]=pMap[p];
+      return`<div style="margin-top:14px"><div style="font-size:9px;font-weight:900;color:var(--muted);letter-spacing:.14em;text-transform:uppercase;font-family:Inter,sans-serif;margin-bottom:8px">領用狀態</div><span class="badge ${pcls}">${ptxt}</span>${o.pickup?.by?`<div style="font-size:10px;color:var(--muted);margin-top:6px">最後更新：${o.pickup.by}</div>`:''}</div>`;
+    })():'');
   document.getElementById('mNote').style.display='none';
   const canAct=o.finalStatus==='pending'&&(currentUser?.role==='super'||o.currentStep===currentUser?.role);
   const isSuper=currentUser?.role==='super';
   document.getElementById('mActs').innerHTML=
     `${canAct?`<button class="btn-outline" onclick="openReject('${o.id}');closeModal()">拒絕</button><button class="btn-blue" onclick="approveStep('${o.id}')">審核通過</button>`:''}
+     ${o.finalStatus==='confirmed'&&isSuper?pickupActionsHTML(o):''}
      ${isSuper&&o.needFinance&&o.finalStatus==='pending'?`<button class="btn-outline" onclick="removeFinance('${o.id}');closeModal()">取消財務審核</button>`:''}
      ${isSuper?`<button class="btn-outline" onclick="closeModal();openEditOrder('${o.id}')">編輯申請</button><button class="btn-sm rd" onclick="closeModal();deleteOrder('${o.id}')" style="padding:10px 14px">刪除</button>`:''}
      ${!canAct&&!isSuper?`<button class="btn-outline" onclick="closeModal()">關閉</button>`:''}
