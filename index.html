@@ -513,7 +513,7 @@ function showPage(id){
   document.getElementById('nav-admin').classList.toggle('active',id==='admin'||id==='login');
   if(id==='apply')loadData(true).then(()=>renderGrid());
   if(id==='form')renderFormItems();
-  if(id==='admin')renderAdmin();
+  if(id==='admin'){renderAdmin();loadData(true).then(()=>renderAdmin());}
   if(id==='query'){
     document.getElementById('queryResults').innerHTML='';
     // 背景偷偷更新，不阻塞畫面
