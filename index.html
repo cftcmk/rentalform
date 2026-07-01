@@ -700,16 +700,14 @@ function buildOrdersHTML(){
 }
 function pickupActionsHTML(o){
   const p=o.pickup?.status||'awaiting';
-  if(p==='awaiting')return`<button class="btn-sm pu" onclick="markPickup('${o.id}','checked')">標記已清點</button>`;
-  if(p==='checked')return`<button class="btn-sm gr" onclick="markPickup('${o.id}','returned')">標記已歸還</button><button class="btn-sm" onclick="markPickup('${o.id}','awaiting')">還原</button>`;
-  return`<button class="btn-sm" onclick="markPickup('${o.id}','checked')">還原</button>`;
+  if(p!=='returned')return`<button class="btn-sm gr" onclick="markPickup('${o.id}','returned')">已清點/歸還</button>`;
+  return`<button class="btn-sm" onclick="markPickup('${o.id}','awaiting')">還原</button>`;
 }
 function getStepBadge(o){
   if(o.finalStatus==='confirmed'){
     const p=o.pickup?.status||'awaiting';
-    const pMap={awaiting:['b-pending','待清點'],checked:['b-finance','已清點・待歸還'],returned:['b-returned','已歸還']};
-    const[pcls,ptxt]=pMap[p];
-    return`<span class="badge b-confirmed">✓ 已通過</span> <span class="badge ${pcls}">${ptxt}</span>`;
+    if(p==='returned')return`<span class="badge b-returned">已歸還</span>`;
+    return`<span class="badge b-confirmed">✓ 已通過</span>`;
   }
   if(o.finalStatus==='rejected') return`<span class="badge b-rejected">✕ 已拒絕</span>`;
   const m={equipment_admin:'b-admin',finance:'b-finance'};
@@ -750,7 +748,7 @@ function markPickup(id,status){
   save();
   if(API_URL)apiPost({action:'updateOrder',order:o}).catch(()=>{});
   renderAdmin();
-  showToast(status==='checked'?'已標記為已清點':status==='returned'?'已標記為已歸還':'狀態已還原');
+  showToast(status==='returned'?'已標記為已歸還・結案':'狀態已還原');
 }
 function removeFinance(id){
   const o=state.orders.find(x=>x.id===id);if(!o)return;
@@ -935,8 +933,7 @@ function viewOrder(id){
   document.getElementById('mFlow').innerHTML=`<div style="margin-top:10px"><div style="font-size:9px;font-weight:900;color:var(--muted);letter-spacing:.14em;text-transform:uppercase;font-family:Inter,sans-serif;margin-bottom:10px">簽核進度</div><div class="flow-row">${fhtml}</div></div>`+
     (o.finalStatus==='confirmed'?(()=>{
       const p=o.pickup?.status||'awaiting';
-      const pMap={awaiting:['b-pending','待清點'],checked:['b-finance','已清點・待歸還'],returned:['b-returned','已歸還']};
-      const[pcls,ptxt]=pMap[p];
+      const[pcls,ptxt]=p==='returned'?['b-returned','已歸還']:['b-confirmed','✓ 已通過（待歸還）'];
       return`<div style="margin-top:14px"><div style="font-size:9px;font-weight:900;color:var(--muted);letter-spacing:.14em;text-transform:uppercase;font-family:Inter,sans-serif;margin-bottom:8px">領用狀態</div><span class="badge ${pcls}">${ptxt}</span>${o.pickup?.by?`<div style="font-size:10px;color:var(--muted);margin-top:6px">最後更新：${o.pickup.by}</div>`:''}</div>`;
     })():'');
   document.getElementById('mNote').style.display='none';
