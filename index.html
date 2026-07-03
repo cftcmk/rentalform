@@ -513,7 +513,7 @@ function showPage(id){
   document.getElementById('nav-admin').classList.toggle('active',id==='admin'||id==='login');
   if(id==='apply')loadData(true).then(()=>renderGrid());
   if(id==='form')renderFormItems();
-  if(id==='admin'){renderAdmin();loadData(true).then(()=>renderAdmin());}
+  if(id==='admin'){showLoading('讀取後台資料...');loadData(true).then(()=>{renderAdmin();hideLoading();});}
   if(id==='query'){
     document.getElementById('queryResults').innerHTML='';
     // 背景偷偷更新，不阻塞畫面
@@ -764,8 +764,18 @@ function deleteOrder(id){
   if(!confirm('確定要刪除申請 '+id+' 嗎？此動作無法復原。'))return;
   state.orders=state.orders.filter(x=>x.id!==id);
   save();
-  if(API_URL)apiPost({action:'deleteOrder',id}).catch(()=>{});
-  renderAdmin();showToast('申請已刪除');
+  renderAdmin();
+  if(API_URL){
+    showLoading('刪除中...');
+    apiPost({action:'deleteOrder',id}).then(()=>{
+      hideLoading();showToast('申請已刪除');
+    }).catch(()=>{
+      hideLoading();
+      showToast('雲端刪除失敗，重新整理後可能會恢復，請檢查 Google Sheets 連線',true);
+    });
+  }else{
+    showToast('申請已刪除');
+  }
 }
 function openEditOrder(id){
   const o=state.orders.find(x=>x.id===id);if(!o)return;
